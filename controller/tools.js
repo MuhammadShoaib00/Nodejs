@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const pdfParse = require('pdf-parse');
 const markdown = require('markdown').markdown;
+const Tesseract = require('tesseract.js');
 const HTMLtoDOCX = require('html-docx-js');
 const mammoth = require('mammoth');
 const puppeteer = require('puppeteer');
@@ -117,4 +118,43 @@ const pngToJpg=(req,res)=>{
       });
 }
 
-module.exports={pdfToWord,docxToPdf,pngToJpg}
+const jpgToPng=(req,res)=>{
+  const imagePath = req.file.path;
+  const outputImagePath = `./uploads/${path.parse(req.file.filename).name}.png`;
+
+  Jimp.read(imagePath)
+      .then(image => {
+          return image.write(outputImagePath); // Write the image in PNG format
+      })
+      .then(() => {
+          res.status(200).json({ message: 'File converted successfully', convertedFile: outputImagePath });
+      })
+      .catch(err => {
+          console.error('Error converting:', err);
+          res.status(500).json({ error: 'Error converting file' });
+      });
+}
+const imageToText =(req,res)=>{
+  const imagePath = path.join(__dirname, req.file.path);
+
+  Tesseract.recognize(
+    imagePath,
+    'eng',
+    {
+      logger: m => console.log(m), // Optional: add logger to see progress
+    }
+  ).then(({ data: { text } }) => {
+    // Delete the uploaded file after processing
+    fs.unlinkSync(imagePath);
+    
+    res.send(`
+      <h2>Recognized text:</h2>
+      <pre>${text}</pre>
+      <a href="/">Go back</a>
+    `);
+  }).catch(err => {
+    console.error('Error:', err);
+    res.status(500).send('An error occurred while processing the image.');
+  });
+}
+module.exports={pdfToWord,docxToPdf,pngToJpg,jpgToPng,imageToText}
